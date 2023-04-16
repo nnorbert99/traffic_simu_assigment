@@ -28,6 +28,12 @@ try:
 
     # World
     world = client.get_world()
+    default_settings = world.get_settings()
+    settings = world.get_settings()
+    settings.synchronous_mode = True
+    settings.fixed_delta_seconds = 0.023
+    world.apply_settings(settings)
+    world.set_weather(carla.WeatherParameters.ClearNoon)
 
     # VUT vehicle with camera attached to it's back
     blueprint_library = world.get_blueprint_library()
@@ -44,8 +50,6 @@ try:
     camera.listen(lambda data: visualize_image(data))
 
     world.tick()
-    world_snapshot = world.wait_for_tick()
-    actor_snapshot = world_snapshot.find(vehicle.id)
 
     # Spectator
     spectator = world.get_spectator()
@@ -57,14 +61,31 @@ try:
     screen.fill((0, 0, 0))
     pygame.display.flip()
 
+    distance = 0.0
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
         world.tick()
+        current_location = vehicle.get_transform().location
+        distance += vehicle_location.location.distance(current_location)
+        vehicle_location.location = current_location
+        print(distance)
+        if distance > 20:
+            vehicle.apply_control(carla.VehicleControl(brake=0.2, steer=0.0))
+        if distance > 34:
+            vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=-0.3))
+        if distance > 67:
+            vehicle.apply_control(carla.VehicleControl(throttle=4.0, steer=0.0))
+        if distance > 83:
+            vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.07))
+        if distance > 87:
+            vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0))
         pygame.display.flip()
 
 finally:
+    world.apply_settings(default_settings)
+    world.tick()
     vehicle.destroy()
     camera.destroy()
     pygame.quit()
