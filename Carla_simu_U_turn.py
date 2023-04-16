@@ -70,7 +70,19 @@ try:
         current_location = vehicle.get_transform().location
         distance += vehicle_location.location.distance(current_location)
         vehicle_location.location = current_location
-        print(distance)
+
+        # set Traffic Lights
+        actors = world.get_actors().filter('traffic.traffic_light')
+        for actor in actors:
+            state = carla.TrafficLightState.Red
+            light_dis = actor.get_location().distance(current_location)
+            if light_dis < 55:
+                state = carla.TrafficLightState.Yellow
+            if light_dis < 45:
+                state = carla.TrafficLightState.Green
+            actor.set_state(state)
+
+        # print(distance)
         if distance > 20:
             vehicle.apply_control(carla.VehicleControl(brake=0.2, steer=0.0))
         if distance > 34:
