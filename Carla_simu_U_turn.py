@@ -9,6 +9,8 @@ CAMERA_HEIGHT = 720
 pygame.init()
 screen = pygame.display.set_mode((CAMERA_WIDTH, CAMERA_HEIGHT))
 
+actor_list = []
+
 
 def visualize_image(image):
     image.convert(carla.ColorConverter.Raw)
@@ -42,12 +44,61 @@ try:
     camera_bp.set_attribute('image_size_x', str(CAMERA_WIDTH))
     camera_bp.set_attribute('image_size_y', str(CAMERA_HEIGHT))
 
-    vehicle_location = carla.Transform(carla.Location(-426.5, 30.4, 0.5))
+    ego_vehicle_location = carla.Transform(carla.Location(-426.5, 30.4, 0.5))
+    ego_vehicle = world.try_spawn_actor(vehicle_bp, ego_vehicle_location)
+    ego_vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0))
+    camera_relative_loc = carla.Transform(carla.Location(x=-5.7, z=3.7), carla.Rotation(pitch=-15))
+    camera = world.spawn_actor(camera_bp, camera_relative_loc, attach_to=ego_vehicle)
+    camera.listen(lambda data: visualize_image(data))
+    actor_list.append(ego_vehicle)
+
+    vehicle_bp = blueprint_library.find('vehicle.audi.a2')
+    vehicle_location = carla.Transform(carla.Location(-426.4, 26.9, 0.5))
+    vehicle = world.try_spawn_actor(vehicle_bp, vehicle_location)
+    vehicle.apply_control(carla.VehicleControl(throttle=0.6, steer=0.0))
+    actor_list.append(vehicle)
+
+    vehicle_bp = blueprint_library.find('vehicle.tesla.model3')
+    vehicle_location = carla.Transform(carla.Location(-447.2, 37.4, 0.5))
     vehicle = world.try_spawn_actor(vehicle_bp, vehicle_location)
     vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0))
-    camera_relative_loc = carla.Transform(carla.Location(x=-5.7, z=3.7), carla.Rotation(pitch=-15))
-    camera = world.spawn_actor(camera_bp, camera_relative_loc, attach_to=vehicle)
-    camera.listen(lambda data: visualize_image(data))
+    actor_list.append(vehicle)
+
+    vehicle_bp = blueprint_library.find('vehicle.nissan.micra')
+    vehicle_location = carla.Transform(carla.Location(-391.5, 33.8, 0.5))
+    vehicle = world.try_spawn_actor(vehicle_bp, vehicle_location)
+    vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0))
+    actor_list.append(vehicle)
+
+    vehicle_bp = blueprint_library.find('vehicle.audi.etron')
+    vehicle_location = carla.Transform(carla.Location(-298.2, 5.4, 3),carla.Rotation(yaw=180))
+    vehicle = world.spawn_actor(vehicle_bp, vehicle_location)
+    vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0))
+    actor_list.append(vehicle)
+
+    vehicle_bp = blueprint_library.find('vehicle.tesla.cybertruck')
+    vehicle_location = carla.Transform(carla.Location(-315.9, 12.7, 3),carla.Rotation(yaw=180))
+    vehicle = world.try_spawn_actor(vehicle_bp, vehicle_location)
+    vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0))
+    actor_list.append(vehicle)
+
+    vehicle_bp = blueprint_library.find('vehicle.dodge.charger_police')
+    vehicle_location = carla.Transform(carla.Location(-347.7, 16.1, 3), carla.Rotation(yaw=180))
+    vehicle = world.try_spawn_actor(vehicle_bp, vehicle_location)
+    vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0))
+    actor_list.append(vehicle)
+
+    vehicle_bp = blueprint_library.find('vehicle.ford.mustang')
+    vehicle_location = carla.Transform(carla.Location(-384.5, -8.5, 3), carla.Rotation(yaw=90))
+    vehicle = world.try_spawn_actor(vehicle_bp, vehicle_location)
+    vehicle.apply_control(carla.VehicleControl(throttle=0.0, steer=0.0))
+    actor_list.append(vehicle)
+
+    vehicle_bp = blueprint_library.find('vehicle.tesla.model3')
+    vehicle_location = carla.Transform(carla.Location(-380.7, -7.4, 3), carla.Rotation(yaw=90))
+    vehicle = world.try_spawn_actor(vehicle_bp, vehicle_location)
+    vehicle.apply_control(carla.VehicleControl(throttle=0.0, steer=0.0))
+    actor_list.append(vehicle)
 
     world.tick()
 
@@ -67,9 +118,9 @@ try:
             if event.type == pygame.QUIT:
                 running = False
         world.tick()
-        current_location = vehicle.get_transform().location
-        distance += vehicle_location.location.distance(current_location)
-        vehicle_location.location = current_location
+        current_location = ego_vehicle.get_transform().location
+        distance += ego_vehicle_location.location.distance(current_location)
+        ego_vehicle_location.location = current_location
 
         # set Traffic Lights
         actors = world.get_actors().filter('traffic.traffic_light')
@@ -84,15 +135,17 @@ try:
 
         # print(distance)
         if distance > 20:
-            vehicle.apply_control(carla.VehicleControl(brake=0.2, steer=0.0))
+            ego_vehicle.apply_control(carla.VehicleControl(brake=0.2, steer=0.0))
+            [a for a in actor_list if a.type_id == 'vehicle.audi.a2'][0].apply_control(
+                carla.VehicleControl(throttle=1.0, steer=0.0))
         if distance > 34:
-            vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=-0.3))
+            ego_vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=-0.3))
         if distance > 67:
-            vehicle.apply_control(carla.VehicleControl(throttle=4.0, steer=0.0))
+            ego_vehicle.apply_control(carla.VehicleControl(throttle=4.0, steer=0.0))
         if distance > 83:
-            vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.07))
+            ego_vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.07))
         if distance > 87:
-            vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0))
+            ego_vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0))
         pygame.display.flip()
 
 finally:
