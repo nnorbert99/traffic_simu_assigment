@@ -133,7 +133,7 @@ try:
                 state = carla.TrafficLightState.Green
             actor.set_state(state)
 
-        # print(distance)
+        print(distance)
         if distance > 20:
             ego_vehicle.apply_control(carla.VehicleControl(brake=0.2, steer=0.0))
             [a for a in actor_list if a.type_id == 'vehicle.audi.a2'][0].apply_control(
