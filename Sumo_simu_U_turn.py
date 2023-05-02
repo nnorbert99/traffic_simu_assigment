@@ -17,11 +17,11 @@ import traci  # noqa
 
 def run():
     step = 0
-    traci.route.add('trip01',['-41.0.00','45.0.00'])
-    traci.vehicle.add('vehicle01', 'trip01',typeID='vehicle.mercedes.coupe')
-    traci.vehicle.moveToXY('vehicle01', '-41', '-41_3',448.26,52.29, keepRoute=1)
+    traci.route.add('trip01', ['-41.0.00', '45.0.00'])
+    traci.vehicle.add('vehicle01', 'trip01', typeID='vehicle.mercedes.coupe')
+    traci.vehicle.moveToXY('vehicle01', '-41', '-41_3', 448.26, 52.29, keepRoute=1)
+    edge = traci.simulation.convertRoad(70, 392)
     while step < 1000:
-
         traci.simulationStep()
         step += 1
     traci.close()

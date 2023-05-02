@@ -1,7 +1,7 @@
 import carla
 import numpy as np
 import pygame
-
+from scenario_descriptor import ScenarioDescription as sc
 CAMERA_WIDTH = 1280
 CAMERA_HEIGHT = 720
 
@@ -36,69 +36,28 @@ try:
     settings.fixed_delta_seconds = 0.023
     world.apply_settings(settings)
     world.set_weather(carla.WeatherParameters.ClearNoon)
-
-    # VUT vehicle with camera attached to it's back
     blueprint_library = world.get_blueprint_library()
-    vehicle_bp = blueprint_library.find('vehicle.mercedes.coupe_2020')
+
+    # Ego vehicle with camera attached to it's back
+
+    vehicle_bp = blueprint_library.find(sc.ego_actor.type)
     camera_bp = blueprint_library.find('sensor.camera.rgb')
     camera_bp.set_attribute('image_size_x', str(CAMERA_WIDTH))
     camera_bp.set_attribute('image_size_y', str(CAMERA_HEIGHT))
-
-    ego_vehicle_location = carla.Transform(carla.Location(-426.5, 30.4, 0.5))
+    ego_vehicle_location = carla.Transform(carla.Location(*sc.ego_actor.pos),carla.Rotation(*sc.ego_actor.rot))
     ego_vehicle = world.try_spawn_actor(vehicle_bp, ego_vehicle_location)
-    ego_vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0))
-    camera_relative_loc = carla.Transform(carla.Location(x=-5.7, z=3.7), carla.Rotation(pitch=-15))
+    ego_vehicle.apply_control(carla.VehicleControl(*sc.ego_actor.control))
+    camera_relative_loc = carla.Transform(carla.Location(*sc.ego_actor.sens_rel_loc), carla.Rotation(pitch=-15))
     camera = world.spawn_actor(camera_bp, camera_relative_loc, attach_to=ego_vehicle)
     camera.listen(lambda data: visualize_image(data))
     actor_list.append(ego_vehicle)
 
-    vehicle_bp = blueprint_library.find('vehicle.audi.a2')
-    vehicle_location = carla.Transform(carla.Location(-426.4, 26.9, 0.5))
-    vehicle = world.try_spawn_actor(vehicle_bp, vehicle_location)
-    vehicle.apply_control(carla.VehicleControl(throttle=0.6, steer=0.0))
-    actor_list.append(vehicle)
-
-    vehicle_bp = blueprint_library.find('vehicle.tesla.model3')
-    vehicle_location = carla.Transform(carla.Location(-447.2, 37.4, 0.5))
-    vehicle = world.try_spawn_actor(vehicle_bp, vehicle_location)
-    vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0))
-    actor_list.append(vehicle)
-
-    vehicle_bp = blueprint_library.find('vehicle.nissan.micra')
-    vehicle_location = carla.Transform(carla.Location(-391.5, 33.8, 0.5))
-    vehicle = world.try_spawn_actor(vehicle_bp, vehicle_location)
-    vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0))
-    actor_list.append(vehicle)
-
-    vehicle_bp = blueprint_library.find('vehicle.audi.etron')
-    vehicle_location = carla.Transform(carla.Location(-298.2, 5.4, 3),carla.Rotation(yaw=180))
-    vehicle = world.spawn_actor(vehicle_bp, vehicle_location)
-    vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0))
-    actor_list.append(vehicle)
-
-    vehicle_bp = blueprint_library.find('vehicle.tesla.cybertruck')
-    vehicle_location = carla.Transform(carla.Location(-315.9, 12.7, 3),carla.Rotation(yaw=180))
-    vehicle = world.try_spawn_actor(vehicle_bp, vehicle_location)
-    vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0))
-    actor_list.append(vehicle)
-
-    vehicle_bp = blueprint_library.find('vehicle.dodge.charger_police')
-    vehicle_location = carla.Transform(carla.Location(-347.7, 16.1, 3), carla.Rotation(yaw=180))
-    vehicle = world.try_spawn_actor(vehicle_bp, vehicle_location)
-    vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0))
-    actor_list.append(vehicle)
-
-    vehicle_bp = blueprint_library.find('vehicle.ford.mustang')
-    vehicle_location = carla.Transform(carla.Location(-384.5, -8.5, 3), carla.Rotation(yaw=90))
-    vehicle = world.try_spawn_actor(vehicle_bp, vehicle_location)
-    vehicle.apply_control(carla.VehicleControl(throttle=0.0, steer=0.0))
-    actor_list.append(vehicle)
-
-    vehicle_bp = blueprint_library.find('vehicle.tesla.model3')
-    vehicle_location = carla.Transform(carla.Location(-380.7, -7.4, 3), carla.Rotation(yaw=90))
-    vehicle = world.try_spawn_actor(vehicle_bp, vehicle_location)
-    vehicle.apply_control(carla.VehicleControl(throttle=0.0, steer=0.0))
-    actor_list.append(vehicle)
+    for actor in sc.other_actors:
+        vehicle_bp = blueprint_library.find(actor.type)
+        vehicle_location = carla.Transform(carla.Location(*actor.pos),carla.Rotation(*actor.rot))
+        vehicle = world.try_spawn_actor(vehicle_bp, vehicle_location)
+        vehicle.apply_control(carla.VehicleControl(*actor.control))
+        actor_list.append(vehicle)
 
     world.tick()
 
@@ -151,6 +110,7 @@ try:
 finally:
     world.apply_settings(default_settings)
     world.tick()
-    vehicle.destroy()
+    for actor in actor_list:
+        actor.destroy()
     camera.destroy()
     pygame.quit()
