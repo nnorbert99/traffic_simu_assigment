@@ -1,7 +1,13 @@
+import os
+import time
+
 import carla
 import numpy as np
+import pandas as pd
 import pygame
+
 from scenario_descriptor import ScenarioDescription as sc
+
 CAMERA_WIDTH = 1280
 CAMERA_HEIGHT = 720
 
@@ -10,6 +16,9 @@ pygame.init()
 screen = pygame.display.set_mode((CAMERA_WIDTH, CAMERA_HEIGHT))
 
 actor_list = []
+metrics_df = pd.DataFrame(
+    columns=['actor_type', 'sumo_id', 'velocity', 'travelled_distance', 'throttle', 'steer', 'brake', 'acceleration',
+             'acc_x', 'acc_y', 'loc_x', 'loc_y', 'heading', 'time_step'])
 
 
 def visualize_image(image):
@@ -20,6 +29,46 @@ def visualize_image(image):
     array = array[:, :, ::-1]
     surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
     screen.blit(surface, (0, 0))
+
+
+def log_metrics(path: str = None, last_tick = False):
+    global metrics_df
+    if path is None:
+        path = os.getcwd()
+    path = os.path.join(path, 'logs')
+    if not os.path.exists(path):
+        os.mkdir(path)
+    filepath = os.path.join(path, f'logged_metrics_{time.time()}.csv')
+    for ac in actor_list:
+        sc_actor = [sc_ac for sc_ac in sc.all_actor if sc_ac.type == ac.type_id][0]
+        actor_type = ac.type_id
+        sumo_id = sc_actor.sumo_id
+        vel = ac.get_velocity().length()
+        time_step = world.get_snapshot().timestamp.delta_seconds
+        travelled_dis = vel * time_step
+        try:
+            type_df = metrics_df.loc[metrics_df['actor_type'] == ac.type_id]
+            travelled_dis = travelled_dis + type_df.iloc[-1,3]
+        except IndexError:
+            pass
+        control = ac.get_control()
+        throttle = control.throttle
+        steer = control.steer
+        brake = control.brake
+        acc_x = ac.get_acceleration().x
+        acc_y = ac.get_acceleration().y
+        acceleration = (acc_x ** 2 + acc_y ** 2) ** (1 / 2)
+        loc_x = ac.get_location().x
+        loc_y = ac.get_location().y
+        heading = ac.get_transform().rotation.yaw
+        new_row = {'actor_type': actor_type, 'sumo_id': sumo_id, 'velocity': vel, 'travelled_distance': travelled_dis,
+                   'throttle': throttle, 'steer': steer, 'brake': brake, 'acceleration': acceleration, 'acc_x': acc_x,
+                   'acc_y': acc_y,'loc_x':loc_x,'loc_y':loc_y,'heading':heading,'time_step':time_step }
+        metrics_df = metrics_df.append(new_row,ignore_index=True)
+
+        if last_tick:
+            metrics_df.to_csv(filepath,index=False)
+
 
 
 try:
@@ -44,7 +93,7 @@ try:
     camera_bp = blueprint_library.find('sensor.camera.rgb')
     camera_bp.set_attribute('image_size_x', str(CAMERA_WIDTH))
     camera_bp.set_attribute('image_size_y', str(CAMERA_HEIGHT))
-    ego_vehicle_location = carla.Transform(carla.Location(*sc.ego_actor.pos),carla.Rotation(*sc.ego_actor.rot))
+    ego_vehicle_location = carla.Transform(carla.Location(*sc.ego_actor.pos), carla.Rotation(*sc.ego_actor.rot))
     ego_vehicle = world.try_spawn_actor(vehicle_bp, ego_vehicle_location)
     ego_vehicle.apply_control(carla.VehicleControl(*sc.ego_actor.control))
     camera_relative_loc = carla.Transform(carla.Location(*sc.ego_actor.sens_rel_loc), carla.Rotation(pitch=-15))
@@ -54,7 +103,7 @@ try:
 
     for actor in sc.other_actors:
         vehicle_bp = blueprint_library.find(actor.type)
-        vehicle_location = carla.Transform(carla.Location(*actor.pos),carla.Rotation(*actor.rot))
+        vehicle_location = carla.Transform(carla.Location(*actor.pos), carla.Rotation(*actor.rot))
         vehicle = world.try_spawn_actor(vehicle_bp, vehicle_location)
         vehicle.apply_control(carla.VehicleControl(*actor.control))
         actor_list.append(vehicle)
@@ -92,7 +141,6 @@ try:
                 state = carla.TrafficLightState.Green
             actor.set_state(state)
 
-        print(distance)
         if distance > 20:
             ego_vehicle.apply_control(carla.VehicleControl(brake=0.2, steer=0.0))
             [a for a in actor_list if a.type_id == 'vehicle.audi.a2'][0].apply_control(
@@ -106,6 +154,7 @@ try:
         if distance > 87:
             ego_vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0))
         pygame.display.flip()
+        log_metrics(last_tick=not running)
 
 finally:
     world.apply_settings(default_settings)
