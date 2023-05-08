@@ -18,7 +18,7 @@ screen = pygame.display.set_mode((CAMERA_WIDTH, CAMERA_HEIGHT))
 actor_list = []
 metrics_df = pd.DataFrame(
     columns=['actor_type', 'sumo_id', 'velocity', 'travelled_distance', 'throttle', 'steer', 'brake', 'acceleration',
-             'acc_x', 'acc_y', 'loc_x', 'loc_y', 'heading', 'time_step'])
+             'acc_x', 'acc_y', 'loc_x', 'loc_y', 'heading', 'time_step', 'time'])
 
 
 def visualize_image(image):
@@ -31,7 +31,7 @@ def visualize_image(image):
     screen.blit(surface, (0, 0))
 
 
-def log_metrics(path: str = None, last_tick = False):
+def log_metrics(path: str = None, last_tick=False):
     global metrics_df
     if path is None:
         path = os.getcwd()
@@ -46,9 +46,11 @@ def log_metrics(path: str = None, last_tick = False):
         vel = ac.get_velocity().length()
         time_step = world.get_snapshot().timestamp.delta_seconds
         travelled_dis = vel * time_step
+        time_val = 0.0
         try:
             type_df = metrics_df.loc[metrics_df['actor_type'] == ac.type_id]
-            travelled_dis = travelled_dis + type_df.iloc[-1,3]
+            travelled_dis = travelled_dis + type_df.iloc[-1, 3]
+            time_val = time_step + metrics_df.iloc[-1, -1]
         except IndexError:
             pass
         control = ac.get_control()
@@ -63,12 +65,12 @@ def log_metrics(path: str = None, last_tick = False):
         heading = ac.get_transform().rotation.yaw
         new_row = {'actor_type': actor_type, 'sumo_id': sumo_id, 'velocity': vel, 'travelled_distance': travelled_dis,
                    'throttle': throttle, 'steer': steer, 'brake': brake, 'acceleration': acceleration, 'acc_x': acc_x,
-                   'acc_y': acc_y,'loc_x':loc_x,'loc_y':loc_y,'heading':heading,'time_step':time_step }
-        metrics_df = metrics_df.append(new_row,ignore_index=True)
+                   'acc_y': acc_y, 'loc_x': loc_x, 'loc_y': loc_y, 'heading': heading, 'time_step': time_step,
+                   'time': time_val}
+        metrics_df = metrics_df.append(new_row, ignore_index=True)
 
         if last_tick:
-            metrics_df.to_csv(filepath,index=False)
-
+            metrics_df.to_csv(filepath, index=False)
 
 
 try:
