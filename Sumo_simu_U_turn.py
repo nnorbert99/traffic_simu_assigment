@@ -68,13 +68,31 @@ def run():
     if df is None:
         raise Exception(f'No log (cvs) file found at {path}')
     speeds = extract_speed_values(df,sc.all_actor)
-    save_plots(df)
+    #save_plots(df)
+    sumo_df = pd.DataFrame(columns=['speed','x','y','heading','time'])
     while step < 1000:
-        traci.simulationStep()
-        for sumo_id,vel in speeds.items():
-            traci.vehicle.setSpeed(sumo_id,vel[step])
-        step += 1
-    traci.close()
+        try:
+            traci.simulationStep()
+            s_speed = traci.vehicle.getSpeed('vehicle0')
+            s_trajectory = traci.vehicle.getPosition('vehicle0')
+            s_heading = traci.vehicle.getAngle('vehicle0')
+            try:
+                s_time = sumo_df.iloc[-1,-1] + step*0.0115
+            except:
+                s_time = 0
+            sumo_dict = {'speed':s_speed, 'x':s_trajectory[0],'y':s_trajectory[1], 'heading':s_heading,'time':s_time}
+            sumo_df = sumo_df.append(sumo_dict, ignore_index=True)
+            for sumo_id,vel in speeds.items():
+                traci.vehicle.setSpeed(sumo_id,vel[step])
+            step += 1
+        except:
+            figure = px.line(sumo_df, x='x', y='y',title='SUMO Trajectory ego')
+            figure.write_html('./sumo_trajectory.html')
+            figure = px.line(sumo_df, x='time', y='speed', title='SUMO velocity ego')
+            figure.write_html('./sumo_vel.html')
+            figure = px.line(sumo_df, x='time', y='heading', title='SUMO heading ego')
+            figure.write_html('./sumo_heading.html')
+            traci.close()
 
 
 if __name__ == '__main__':
