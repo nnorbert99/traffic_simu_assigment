@@ -77,7 +77,7 @@ def run():
             s_trajectory = traci.vehicle.getPosition('vehicle0')
             s_heading = traci.vehicle.getAngle('vehicle0')
             try:
-                s_time = sumo_df.iloc[-1,-1] + step*0.0115
+                s_time = sumo_df.iloc[-1,-1] + 0.115
             except:
                 s_time = 0
             sumo_dict = {'speed':s_speed, 'x':s_trajectory[0],'y':s_trajectory[1], 'heading':s_heading,'time':s_time}
@@ -92,6 +92,7 @@ def run():
             figure.write_html('./sumo_vel.html')
             figure = px.line(sumo_df, x='time', y='heading', title='SUMO heading ego')
             figure.write_html('./sumo_heading.html')
+            sumo_df.to_csv('./logs/sumo_logged.csv')
             traci.close()
 
 
