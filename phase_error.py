@@ -1,9 +1,9 @@
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
+import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 from scipy.signal import correlate
+from tabulate import tabulate
 
 
 def calculate_phase_error(speed1, speed2, c, r):
@@ -24,10 +24,9 @@ carla_heading = pd.read_csv('ego_heading_carla.csv')
 carla_speed = pd.read_csv('ego_speed_carla.csv')
 carla_traj = pd.read_csv('ego_trajec_carla.csv')
 sumo = pd.read_csv('sumo_logged.csv')
-# Correct the offset in the Carla data
-# corrected_carla_heading = np.where(carla_heading.heading.values < 0, carla_heading.heading.values + 360,
-#                                    carla_heading.heading.values)
+cosim = pd.read_csv('cosim_log.csv')
 
+# Correct the offset in the Carla data
 corrected_carla_heading = []
 for idx, val in enumerate(carla_heading.heading.values):
     if -90 < val < 180:
@@ -36,154 +35,243 @@ for idx, val in enumerate(carla_heading.heading.values):
         corrected_carla_heading.append(val + 450)
 corrected_carla_heading = np.array(corrected_carla_heading)
 
+corrected_cosim_heading = []
+for idx, val in enumerate(cosim.heading.values):
+    if -90 < val < 180:
+        corrected_cosim_heading.append(val + 90)
+    else:
+        corrected_cosim_heading.append(val + 450)
+corrected_cosim_heading = np.array(corrected_cosim_heading)
+
 sumo_x = sumo.x.values
 carla_x = carla_traj.loc_x.values + 503.02
 sumo_y = sumo.y.values
 carla_y = -carla_traj.loc_y.values + 423.76
+cosim_x = cosim.loc_x.values + 503.02
+cosim_y = -cosim.loc_y.values + 423.76
 
 carla_timestep = 0.23
 
 # Create time arrays for Carla and SUMO data
 carla_time = np.arange(0, len(carla_speed) * carla_timestep, carla_timestep)
 sumo_time = sumo.time.values
+cosim_time = np.linspace(carla_time[0], carla_time[-1], len(cosim))
 
-# Adjust Carla data to match the time range of SUMO data
-carla_time_adjusted = np.linspace(carla_time[0], carla_time[-1], len(sumo_time))
-
-# Interpolate Carla data to match SUMO time points
+# Interpolate Carla and Cosim data to match SUMO time points
 # speed
 interpolator_speed = interp1d(carla_time, carla_speed.velocity)
-interpolated_carla_speed = interpolator_speed(carla_time_adjusted)
+interpolated_carla_speed = interpolator_speed(sumo_time)
+interpolator_speed_cosim = interp1d(cosim_time, cosim.velocity)
+interpolated_cosim_speed = interpolator_speed_cosim(sumo_time)
+
 # heading
 interpolator_heading = interp1d(carla_time, corrected_carla_heading)
-interpolated_carla_heading = interpolator_heading(carla_time_adjusted)
+interpolated_carla_heading = interpolator_heading(sumo_time)
+interpolator_heading_cosim = interp1d(cosim_time, corrected_cosim_heading)
+interpolated_cosim_heading = interpolator_heading_cosim(sumo_time)
+
 # X
-interpolator_heading = interp1d(carla_time, carla_x)
-interpolated_carla_x = interpolator_heading(carla_time_adjusted)
+interpolator_x = interp1d(carla_time, carla_x)
+interpolated_carla_x = interpolator_x(sumo_time)
+interpolator_x_cosim = interp1d(cosim_time, cosim_x)
+interpolated_cosim_x = interpolator_x_cosim(sumo_time)
+
 # Y
-interpolator_heading = interp1d(carla_time, carla_y)
-interpolated_carla_y = interpolator_heading(carla_time_adjusted)
+interpolator_y = interp1d(carla_time, carla_y)
+interpolated_carla_y = interpolator_y(sumo_time)
+interpolator_y_cosim = interp1d(cosim_time, cosim_y)
+interpolated_cosim_y = interpolator_y_cosim(sumo_time)
 
 # Plotting speed
-plt.plot(sumo_time, sumo.speed, label='SUMO Speed')
-plt.plot(carla_time_adjusted, interpolated_carla_speed, label='Carla Speed')
-plt.xlabel('Time')
-plt.ylabel('Speed')
+plt.plot(sumo_time, sumo.speed, color='black', label='SUMO Speed')
+plt.plot(sumo_time, interpolated_carla_speed, color='darkorange', label='Carla Speed')
+plt.plot(sumo_time, interpolated_cosim_speed, color='darkred', label='Co-simulation Speed')
+plt.xlabel('Time [s]')
+plt.ylabel('Speed [m/s]')
 plt.legend()
-plt.title('Comparison of SUMO and Carla Speed')
+plt.title('Comparison of Speed in Simulations')
+plt.grid(True)
 plt.show()
-
-sumo_trace = go.Scatter(x=sumo_time, y=sumo.speed, name='SUMO', mode='lines', line={'dash':'dash'})
-carla_trace = go.Scatter(x=carla_time_adjusted, y=interpolated_carla_speed, name='CARLA', mode='lines')
-fig = go.Figure(data=[sumo_trace, carla_trace],
-                layout=go.Layout(title='Comparison between Sumo and Carla velocity',
-                                 xaxis={'title': 'Time'},
-                                 yaxis={'title': 'Velocity'}))
-fig.show()
 
 # Plotting heading
-plt.plot(sumo_time, sumo.heading, label='SUMO heading')
-plt.plot(carla_time_adjusted, interpolated_carla_heading, label='Carla heading')
-plt.xlabel('Time')
-plt.ylabel('Heading angle')
+plt.plot(sumo_time, sumo.heading, color='black', label='SUMO Heading')
+plt.plot(sumo_time, interpolated_carla_heading, color='darkorange', label='Carla Heading')
+plt.plot(sumo_time, interpolated_cosim_heading, color='darkred', label='Co-simulation Heading')
+plt.xlabel('Time [s]')
+plt.ylabel('Heading angle [deg]')
 plt.legend()
-plt.title('Comparison of SUMO and Carla Heading')
+plt.title('Comparison of Heading in Simulations')
+plt.grid(True)
 plt.show()
 
-sumo_trace = go.Scatter(x=sumo_time, y=sumo.heading, name='SUMO', mode='lines', line={'dash':'dash'})
-carla_trace = go.Scatter(x=carla_time_adjusted, y=interpolated_carla_heading, name='CARLA', mode='lines')
-fig = go.Figure(data=[sumo_trace, carla_trace],
-                layout=go.Layout(title='Comparison between Sumo and Carla heading angle',
-                                 xaxis={'title': 'Time'},
-                                 yaxis={'title': 'heading angle'}))
-fig.show()
-
 # Plotting trajectory
-# plot car1's trajectory, 'b-' means blue line
-plt.plot(sumo_x, sumo_y, 'b-', label='SUMO')
-# plot car2's trajectory, 'r--' means red dashed line
-plt.plot(carla_x, carla_y, 'r--', label='CARLA')
-plt.legend()  # display labels in a legend
-plt.xlabel('X Coordinate')  # x-axis label
-plt.ylabel('Y Coordinate')  # y-axis label
-plt.title('Car Trajectories')  # plot title
-plt.show()  # display the plot
+plt.plot(sumo_x, sumo_y, 'k--', label='SUMO')
+plt.plot(carla_x, carla_y, color='darkorange', linestyle='--', label='CARLA')
+plt.plot(cosim_x, cosim_y, color='darkred', linestyle='--', label='CO_SIMULATION')
+plt.legend()
+plt.xlabel('X Coordinate')
+plt.ylabel('Y Coordinate')
+plt.title('Car Trajectories')
+plt.grid(True)
+plt.show()
 
-sumo_trace = go.Scatter(x=sumo_x, y=sumo_y, name='SUMO', mode='lines', line={'dash':'dash'})
-carla_trace = go.Scatter(x=carla_x, y=carla_y, name='CARLA', mode='lines')
-fig = go.Figure(data=[sumo_trace, carla_trace],
-                layout=go.Layout(title='Comparison between Sumo and Carla trajectory',
-                                 xaxis={'title': 'X'},
-                                 yaxis={'title': 'Y'}))
-fig.show()
 
 # Initialize the ranges for c and r
-c_range = np.linspace(1, 60, 100)
-r_range = np.linspace(1, 60, 100)
+c_range = np.linspace(0, 100, 500)
+r_range = np.linspace(0.001, 100, 500)
 
-# Initialize a dictionary to store the phase errors
-phase_errors = {}
-# Compute the phase error for each combination of c and r
+
+# Initialize dictionaries to store the phase errors for cosim, sumo, and Carla data
+phase_errors_sumoVScosim = {}
+phase_errors_sumoVSCarla = {}
+phase_errors_carlaVSCosim = {}
+
+# Compute the phase error for each combination of c and r for cosim data
 for c in c_range:
     for r in r_range:
-        phase_error, n_shift = calculate_phase_error(sumo.speed.values, interpolated_carla_speed, c, r)
-        phase_errors[(c, r)] = phase_error
-phase_errors_h = {}
-# for c in c_range:
-#     for r in r_range:
-#         phase_error_h, n_shift_h = calculate_phase_error(sumo.heading.values, interpolated_carla_heading, c, r)
-#         phase_errors_h[(c, r)] = phase_error_h
-# phase_errors_x = {}
-# for c in c_range:
-#     for r in r_range:
-#         phase_error_x, n_shift_h = calculate_phase_error(sumo_x, interpolated_carla_x, c, r)
-#         phase_errors_x[(c, r)] = phase_error_x
-# phase_errors_y = {}
-# for c in c_range:
-#     for r in r_range:
-#         phase_error_y, n_shift_y = calculate_phase_error(sumo_y, interpolated_carla_y, c, r)
-#         phase_errors_y[(c, r)] = phase_error_y
-#
-# # Find the (c, r) pair with the smallest phase error
-# best_c, best_r = min(phase_errors, key=phase_errors.get)
-# best_c_h, best_r_h = min(phase_errors_h, key=phase_errors_h.get)
-# best_c_x, best_r_x = min(phase_errors_x, key=phase_errors_x.get)
-# best_c_y, best_r_y = min(phase_errors_y, key=phase_errors_y.get)
-best_c = 20
-best_r = 10
+        phase_error_sumoVScosim, n_shift_cosim = calculate_phase_error(sumo.speed.values, interpolated_cosim_speed, c, r)
+        phase_errors_sumoVScosim[(c, r)] = phase_error_sumoVScosim
 
-best_c_h = 20
-best_r_h = 10
+# Compute the phase error for each combination of c and r for sumo data
+for c in c_range:
+    for r in r_range:
+        phase_error_sumoVSCarla, n_shift_sumo = calculate_phase_error(sumo.speed.values, interpolated_carla_speed, c, r)
+        phase_errors_sumoVSCarla[(c, r)] = phase_error_sumoVSCarla
 
-best_c_x = 20
-best_r_x = 10
+# Compute the phase error for each combination of c and r for Carla data
+for c in c_range:
+    for r in r_range:
+        phase_error_carlaVSCosim, n_shift_carla = calculate_phase_error(interpolated_cosim_speed, interpolated_carla_speed, c, r)
+        phase_errors_carlaVSCosim[(c, r)] = phase_error_carlaVSCosim
 
-best_c_y = 20
-best_r_y = 10
+# Find the (c, r) pair with the smallest phase error for cosim, sumo, and Carla data
+best_c_sumoVScosim, best_r_sumoVScosim = min(phase_errors_sumoVScosim, key=phase_errors_sumoVScosim.get)
+best_c_sumoVSCarla, best_r_sumoVSCarla = min(phase_errors_sumoVSCarla, key=phase_errors_sumoVSCarla.get)
+best_c_carlaVSCosim, best_r_carlaVSCosim = min(phase_errors_carlaVSCosim, key=phase_errors_carlaVSCosim.get)
 
-phase_error, n_shift = calculate_phase_error(sumo.speed, interpolated_carla_speed, best_c, best_r)
-phase_error_h, n_shift_h = calculate_phase_error(sumo.heading, interpolated_carla_heading, best_c_h, best_r_h)
-phase_error_x, n_shift_x = calculate_phase_error(sumo_x, interpolated_carla_x, best_c_x, best_r_x)
-phase_error_y, n_shift_y = calculate_phase_error(sumo_y, interpolated_carla_y, best_c_y, best_r_y)
+# Create a table to store the results
+table = [
+    ["Method", "C", "R", "n*", "Phase Error"],
+    ["SUMO VS CARLA", best_c_sumoVSCarla, best_r_sumoVSCarla, n_shift_sumo, phase_errors_sumoVSCarla[(best_c_sumoVSCarla, best_r_sumoVSCarla)]],
+    ["SUMO VS COSIM", best_c_sumoVScosim, best_r_sumoVScosim, n_shift_cosim, phase_errors_sumoVScosim[(best_c_sumoVScosim, best_r_sumoVScosim)]],
+    ["CARLA VS COSIM", best_c_carlaVSCosim, best_r_carlaVSCosim, n_shift_carla, phase_errors_carlaVSCosim[(best_c_carlaVSCosim, best_r_carlaVSCosim)]]
+]
 
-print("SPEED")
-print("C: " + str(best_c))
-print("R: " + str(best_r))
-print("n* : " + str(n_shift))
-print("Phase error: " + str(phase_error))
-print()
-print("HEADING")
-print("C: " + str(best_c_h))
-print("R: " + str(best_r_h))
-print("n* : " + str(n_shift_h))
-print("Phase error: " + str(phase_error_h))
-print("X")
-print("C: " + str(best_c_x))
-print("R: " + str(best_r_x))
-print("n* : " + str(n_shift_x))
-print("Phase error: " + str(phase_error_x))
-print("Y")
-print("C: " + str(best_c_y))
-print("R: " + str(best_r_y))
-print("n* : " + str(n_shift_y))
-print("Phase error: " + str(phase_error_y))
+# Print the table
+print(tabulate(table, headers="firstrow"))
+
+# Initialize dictionaries to store the phase errors for cosim, sumo, and Carla data
+phase_errors_sumo_headingVScosim = {}
+phase_errors_sumo_headingVSCarla = {}
+phase_errors_carla_headingVSCosim = {}
+
+# Compute the phase error for each combination of c and r for cosim data (heading values)
+for c in c_range:
+    for r in r_range:
+        phase_error_sumo_headingVScosim, n_shift_cosim_heading = calculate_phase_error(sumo.heading.values, interpolated_cosim_heading, c, r)
+        phase_errors_sumo_headingVScosim[(c, r)] = phase_error_sumo_headingVScosim
+
+# Compute the phase error for each combination of c and r for sumo data (heading values)
+for c in c_range:
+    for r in r_range:
+        phase_error_sumo_headingVSCarla, n_shift_sumo_heading = calculate_phase_error(sumo.heading.values, interpolated_carla_heading, c, r)
+        phase_errors_sumo_headingVSCarla[(c, r)] = phase_error_sumo_headingVSCarla
+
+# Compute the phase error for each combination of c and r for Carla data (heading values)
+for c in c_range:
+    for r in r_range:
+        phase_error_carla_headingVSCosim, n_shift_carla_heading = calculate_phase_error(interpolated_cosim_heading, interpolated_carla_heading, c, r)
+        phase_errors_carla_headingVSCosim[(c, r)] = phase_error_carla_headingVSCosim
+
+# Find the (c, r) pair with the smallest phase error for cosim, sumo, and Carla data (heading values)
+best_c_sumo_headingVScosim, best_r_sumo_headingVScosim = min(phase_errors_sumo_headingVScosim, key=phase_errors_sumo_headingVScosim.get)
+best_c_sumo_headingVSCarla, best_r_sumo_headingVSCarla = min(phase_errors_sumo_headingVSCarla, key=phase_errors_sumo_headingVSCarla.get)
+best_c_carla_headingVSCosim, best_r_carla_headingVSCosim = min(phase_errors_carla_headingVSCosim, key=phase_errors_carla_headingVSCosim.get)
+
+# Create a table to store the results (heading values)
+table_heading = [
+    ["Method", "C", "R", "n*", "Phase Error"],
+    ["SUMO VS CARLA", best_c_sumo_headingVSCarla, best_r_sumo_headingVSCarla, n_shift_sumo_heading, phase_errors_sumo_headingVSCarla[(best_c_sumo_headingVSCarla, best_r_sumo_headingVSCarla)]],
+    ["SUMO VS COSIM", best_c_sumo_headingVScosim, best_r_sumo_headingVScosim, n_shift_cosim_heading, phase_errors_sumo_headingVScosim[(best_c_sumo_headingVScosim, best_r_sumo_headingVScosim)]],
+    ["CARLA VS COSIM", best_c_carla_headingVSCosim, best_r_carla_headingVSCosim, n_shift_carla_heading, phase_errors_carla_headingVSCosim[(best_c_carla_headingVSCosim, best_r_carla_headingVSCosim)]]
+]
+
+# Print the table (heading values)
+print(tabulate(table_heading, headers="firstrow"))
+
+# Initialize dictionaries to store the phase errors for cosim, sumo, and Carla data
+phase_errors_sumo_xVScosim_x = {}
+phase_errors_sumo_xVSCarla_x = {}
+phase_errors_carla_xVSCosim_x = {}
+
+phase_errors_sumo_yVScosim_y = {}
+phase_errors_sumo_yVSCarla_y = {}
+phase_errors_carla_yVSCosim_y = {}
+
+# Compute the phase error for each combination of c and r for cosim data (x locations)
+for c in c_range:
+    for r in r_range:
+        phase_error_sumo_xVScosim_x, n_shift_cosim_x = calculate_phase_error(sumo_x, interpolated_cosim_x, c, r)
+        phase_errors_sumo_xVScosim_x[(c, r)] = phase_error_sumo_xVScosim_x
+
+# Compute the phase error for each combination of c and r for sumo data (x locations)
+for c in c_range:
+    for r in r_range:
+        phase_error_sumo_xVSCarla_x, n_shift_sumo_x = calculate_phase_error(sumo_x, interpolated_carla_x, c, r)
+        phase_errors_sumo_xVSCarla_x[(c, r)] = phase_error_sumo_xVSCarla_x
+
+# Compute the phase error for each combination of c and r for Carla data (x locations)
+for c in c_range:
+    for r in r_range:
+        phase_error_carla_xVSCosim_x, n_shift_carla_x = calculate_phase_error(interpolated_cosim_x, interpolated_carla_x, c, r)
+        phase_errors_carla_xVSCosim_x[(c, r)] = phase_error_carla_xVSCosim_x
+
+# Compute the phase error for each combination of c and r for cosim data (y locations)
+for c in c_range:
+    for r in r_range:
+        phase_error_sumo_yVScosim_y, n_shift_cosim_y = calculate_phase_error(sumo_y, interpolated_cosim_y, c, r)
+        phase_errors_sumo_yVScosim_y[(c, r)] = phase_error_sumo_yVScosim_y
+
+# Compute the phase error for each combination of c and r for sumo data (y locations)
+for c in c_range:
+    for r in r_range:
+        phase_error_sumo_yVSCarla_y, n_shift_sumo_y = calculate_phase_error(sumo_y, interpolated_carla_y, c, r)
+        phase_errors_sumo_yVSCarla_y[(c, r)] = phase_error_sumo_yVSCarla_y
+
+# Compute the phase error for each combination of c and r for Carla data (y locations)
+for c in c_range:
+    for r in r_range:
+        phase_error_carla_yVSCosim_y, n_shift_carla_y = calculate_phase_error(interpolated_cosim_y, interpolated_carla_y, c, r)
+        phase_errors_carla_yVSCosim_y[(c, r)] = phase_error_carla_yVSCosim_y
+
+# Find the (c, r) pair with the smallest phase error for cosim, sumo, and Carla data (x locations)
+best_c_sumo_xVScosim_x, best_r_sumo_xVScosim_x = min(phase_errors_sumo_xVScosim_x, key=phase_errors_sumo_xVScosim_x.get)
+best_c_sumo_xVSCarla_x, best_r_sumo_xVSCarla_x = min(phase_errors_sumo_xVSCarla_x, key=phase_errors_sumo_xVSCarla_x.get)
+best_c_carla_xVSCosim_x, best_r_carla_xVSCosim_x = min(phase_errors_carla_xVSCosim_x, key=phase_errors_carla_xVSCosim_x.get)
+
+# Find the (c, r) pair with the smallest phase error for cosim, sumo, and Carla data (y locations)
+best_c_sumo_yVScosim_y, best_r_sumo_yVScosim_y = min(phase_errors_sumo_yVScosim_y, key=phase_errors_sumo_yVScosim_y.get)
+best_c_sumo_yVSCarla_y, best_r_sumo_yVSCarla_y = min(phase_errors_sumo_yVSCarla_y, key=phase_errors_sumo_yVSCarla_y.get)
+best_c_carla_yVSCosim_y, best_r_carla_yVSCosim_y = min(phase_errors_carla_yVSCosim_y, key=phase_errors_carla_yVSCosim_y.get)
+
+# Create a table to store the results (x locations)
+table_x = [
+    ["Method", "C", "R", "n*", "Phase Error"],
+    ["SUMO VS CARLA", best_c_sumo_xVSCarla_x, best_r_sumo_xVSCarla_x, n_shift_sumo_x, phase_errors_sumo_xVSCarla_x[(best_c_sumo_xVSCarla_x, best_r_sumo_xVSCarla_x)]],
+    ["SUMO VS COSIM", best_c_sumo_xVScosim_x, best_r_sumo_xVScosim_x, n_shift_cosim_x, phase_errors_sumo_xVScosim_x[(best_c_sumo_xVScosim_x, best_r_sumo_xVScosim_x)]],
+    ["CARLA VS COSIM", best_c_carla_xVSCosim_x, best_r_carla_xVSCosim_x, n_shift_carla_x, phase_errors_carla_xVSCosim_x[(best_c_carla_xVSCosim_x, best_r_carla_xVSCosim_x)]]
+]
+
+# Print the table (x locations)
+print(tabulate(table_x, headers="firstrow"))
+
+# Create a table to store the results (y locations)
+table_y = [
+    ["Method", "C", "R", "n*", "Phase Error"],
+    ["SUMO VS CARLA", best_c_sumo_yVSCarla_y, best_r_sumo_yVSCarla_y, n_shift_sumo_y, phase_errors_sumo_yVSCarla_y[(best_c_sumo_yVSCarla_y, best_r_sumo_yVSCarla_y)]],
+    ["SUMO VS COSIM", best_c_sumo_yVScosim_y, best_r_sumo_yVScosim_y, n_shift_cosim_y, phase_errors_sumo_yVScosim_y[(best_c_sumo_yVScosim_y, best_r_sumo_yVScosim_y)]],
+    ["CARLA VS COSIM", best_c_carla_yVSCosim_y, best_r_carla_yVSCosim_y, n_shift_carla_y, phase_errors_carla_yVSCosim_y[(best_c_carla_yVSCosim_y, best_r_carla_yVSCosim_y)]]
+]
+
+# Print the table (y locations)
+print(tabulate(table_y, headers="firstrow"))
