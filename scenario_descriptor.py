@@ -50,29 +50,17 @@ class ScenarioDescription:
             'vehicle.audi.etron',
             (1.0, 0.0, 0.0)),
         Actor(
-            (-315.9, 13, 3),
+            (-315.9, 12.7, 3),
             (0, 180, 0),
-            (-424.65, 13.54, -0.01),
+            (-464.65, 14.54, -0.01),
             'vehicle.tesla.cybertruck',
             (1.0, 0.0, 0.0)),
         Actor(
-            (-347.7, 16.1, 3),
+            (-337.7, 16.1, 3),
             (0, 180, 0),
-            (-427.86, 16.06, -0.03),
+            (-470.86, 17.06, -0.03),
             'vehicle.dodge.charger_police',
             (1.0, 0.0, 0.0)),
-        Actor(
-            (-384.5, -8.5, 3),
-            (0, 90, 0),
-            (-384.50, -8.50, -0.00),
-            'vehicle.ford.mustang',
-            (0.0, 0.0, 0.0)),
-        Actor(
-            (-380.7, -7.4, 3),
-            (0, 90, 0),
-            (-380.70, -7.40, 0.00),
-            'vehicle.audi.tt',
-            (0.0, 0.0, 0.0)),
     ]
     all_actor = [ego_actor]
     all_actor.extend(other_actors)
